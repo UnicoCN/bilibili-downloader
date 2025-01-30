@@ -1,0 +1,5 @@
+output/*
+cookie.txt
+.*
+*.log
+!.gitignore
