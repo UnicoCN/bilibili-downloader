@@ -1,0 +1,30 @@
+api:
+  video_info: "https://api.bilibili.com/x/web-interface/view"
+  video_stream: "https://api.bilibili.com/x/player/playurl"
+
+paths:
+  downloads: "downloads"
+  logs: "logs"
+  data: "data"
+  temp: "data/temp"
+
+logging:
+  filename: "bilibili_downloader.log"
+  max_size: 5242880  # 5MB
+  backup_count: 3
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+
+file:
+  extensions:
+    video: ".m4s"
+    audio: ".m4s"
+    output: ".mp4"
+
+http:
+  headers:
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    referer: "https://www.bilibili.com"
+    origin: "https://www.bilibili.com"
+
+user:
+  sessdata: ""  # Will be overridden by user.yaml
