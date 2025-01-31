@@ -1,13 +1,14 @@
 from pathlib import Path
 from typing import Dict, Optional, Tuple
-import requests
 from concurrent.futures import ThreadPoolExecutor
+
+import requests
 from tqdm import tqdm
 
-from ..config import config
+from ..config import Config
 from .logger import log_info, log_error
 
-def get_video_info(bv_id: str, cookies: str) -> Dict:
+def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict:
     """Fetch video information from Bilibili"""
     try:
         response = requests.get(
@@ -26,7 +27,7 @@ def get_video_info(bv_id: str, cookies: str) -> Dict:
         log_error(f"Error fetching video information: {e}")
         return {"error": str(e)}
 
-def get_video_stream_info(bv_id, cid, my_cookie):
+def get_video_stream_info(config: Config, bv_id, cid, my_cookie):
     """Fetch video stream information from Bilibili.
     
     Args:
@@ -68,7 +69,7 @@ def get_video_stream_info(bv_id, cid, my_cookie):
         log_error(f"Error fetching video stream information: {e}")
         return {"error": str(e)}
 
-def download_file(url: str, output_path: Path, desc: Optional[str] = None) -> None:
+def download_file(config: Config, url: str, output_path: Path, desc: Optional[str] = None) -> None:
     """Download file with progress bar"""
     response = requests.get(
         url, 
@@ -91,7 +92,7 @@ def download_file(url: str, output_path: Path, desc: Optional[str] = None) -> No
                 size = f.write(chunk)
                 pbar.update(size)
 
-def parallel_download(video_url: str, audio_url: str, output_dir: Path, 
+def parallel_download(config: Config, video_url: str, audio_url: str, output_dir: Path, 
                      only_video: bool = False, only_audio: bool = False) -> Tuple[Optional[Path], Optional[Path]]:
     """Download video and audio files in parallel"""
     video_path = None
@@ -103,13 +104,13 @@ def parallel_download(video_url: str, audio_url: str, output_dir: Path,
         if not only_audio:
             video_path = output_dir / f'video{config.get_file_extension("video")}'
             futures.append(
-                executor.submit(download_file, video_url, video_path, "Downloading video")
+                executor.submit(download_file, config, video_url, video_path, "Downloading video")
             )
         
         if not only_video:
             audio_path = output_dir / f'audio{config.get_file_extension("audio")}'
             futures.append(
-                executor.submit(download_file, audio_url, audio_path, "Downloading audio")
+                executor.submit(download_file, config, audio_url, audio_path, "Downloading audio")
             )
         
         # Wait for all downloads to complete

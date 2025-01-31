@@ -1,8 +1,6 @@
 import logging
-import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
-from ..config import config
 
 def setup_logger(log_file: Path, max_size: int, backup_count: int, log_format: str) -> logging.Logger:
     """Setup and return a configured logger instance"""
@@ -19,14 +17,14 @@ def setup_logger(log_file: Path, max_size: int, backup_count: int, log_format: s
         backupCount=backup_count
     )
     file_handler.setFormatter(formatter)
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-
+    
     # Add handlers
     logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
+    
+    # Disable console logging by default
+    # console_handler = logging.StreamHandler(sys.stdout)
+    # console_handler.setFormatter(formatter)
+    # logger.addHandler(console_handler)
     return logger
 
 def get_logger() -> logging.Logger:

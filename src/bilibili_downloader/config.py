@@ -4,8 +4,8 @@ from typing import Dict, Any
 import shutil
 
 class Config:
-    def __init__(self):
-        self.root_dir: Path = Path(__file__).parent.parent.parent.resolve()
+    def __init__(self, root_path: Path):
+        self.root_dir: Path = root_path
         self._setup_paths()
         self.load_config()
         self.setup_directories()
@@ -86,5 +86,3 @@ class Config:
         }
         return headers
 
-# Create global config instance
-config = Config()
