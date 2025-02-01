@@ -106,10 +106,10 @@ user:
 ```
 
 ### Output Files
-- Video files: `downloads/<uploader>/<title>.mp4`
-- Video info: `downloads/video_info.json`
-- Stream info: `downloads/video_stream_info.json`
-- Logs: `logs/bilibili_downloader.log`
+- Video files: `<downloads_path>/<uploader>/<title>.mp4`
+- Video info: `<downloads_path>/video_info.json`
+- Stream info: `<downloads_path>/video_stream_info.json`
+- Logs: `<logs_path>/bilibili_downloader.log`
 
 ## 🤝 Contributing
 
