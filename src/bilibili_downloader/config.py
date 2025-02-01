@@ -6,18 +6,18 @@ import shutil
 class Config:
     def __init__(self, root_path: Path):
         self.root_dir: Path = root_path
-        self._setup_paths()
-        self.load_config()
+        self.config_dir = self.root_dir / "config"
+        self.load_config()  # Load config first
+        self._setup_paths()  # Then setup paths using config values
         self.setup_directories()
         self._check_dependencies()
 
     def _setup_paths(self) -> None:
-        """Setup all path attributes"""
-        self.config_dir = self.root_dir / "config"
-        self.data_dir = self.root_dir / "data"
-        self.temp_dir = self.data_dir / "temp"
-        self.downloads_dir = self.root_dir / "downloads"
-        self.logs_dir = self.root_dir / "logs"
+        """Setup all path attributes using config values"""
+        self.data_dir = self.root_dir / self.config['paths']['data']
+        self.temp_dir = self.root_dir / self.config['paths']['temp']
+        self.downloads_dir = self.root_dir / self.config['paths']['downloads']
+        self.logs_dir = self.root_dir / self.config['paths']['logs']
 
     def load_config(self) -> None:
         """Load configuration from YAML files"""

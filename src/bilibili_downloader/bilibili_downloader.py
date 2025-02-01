@@ -43,7 +43,7 @@ class BilibiliDownloader():
         parser.add_argument(
             '-o', '--output',
             type=Path,
-            default=self.config.downloads_dir,  # Fixed reference
+            default=self.config.downloads_dir,
             help='Output directory for downloaded files (default: downloads/)'
         )
 
@@ -128,7 +128,7 @@ class BilibiliDownloader():
             log_info("Starting parallel download of video and audio...")
             try:
                 video_input_file, audio_input_file = parallel_download(
-                    self.config, video_url, audio_url, self.config.temp_dir,
+                    self.config, bv_id, video_url, audio_url, self.config.temp_dir,
                     only_video, only_audio
                 )
                 if not video_input_file and not only_audio:
