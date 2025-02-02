@@ -21,55 +21,21 @@ class BilibiliDownloader():
         self.config = Config(config_path)
         self.args = None
 
-    def download(self) -> Optional[Path]:
-        self._init_args()
+    def download(self, bv_id: str, output_path: Path = None, only_info: bool = False, only_video: bool = False, only_audio: bool = False) -> Optional[Path]:
         self._set_logger()
+
+        self.bv_id = bv_id
+        self.output_dir = output_path if output_path else self.config.downloads_dir
+
+        self.only_info = only_info
+
+        self.only_video = only_video
+        self.only_audio = only_audio
+
         return self._download_video()
 
     def get_config(self) -> Config:
         return self.config
-
-    def _create_parser(self):
-        parser = argparse.ArgumentParser(
-            description='Download videos with BV ID in Bilibili'
-        )
-        
-        parser.add_argument(
-            "-id", '--bvid',
-            type=str, required=True,
-            help='BVid of the video from bilibili (e.g., BV1xx411c7mD)'
-        )
-
-        parser.add_argument(
-            '-o', '--output',
-            type=Path,
-            default=self.config.downloads_dir,
-            help='Output directory for downloaded files (default: downloads/)'
-        )
-
-        parser.add_argument(
-            '--only-info',
-            action='store_true',
-            help='Only fetch video information and stream URLs'
-        )
-
-        parser.add_argument(
-            '--only-video',
-            action='store_true',
-            help='Only download the video stream (without audio)'
-        )
-
-        parser.add_argument(
-            '--only-audio',
-            action='store_true',
-            help='Only download the audio stream (without video)'
-        )
-
-        return parser
-            
-    def _init_args(self):
-        parser = self._create_parser()
-        self.args = parser.parse_args()
     
     def _set_logger(self):
         self.logger = setup_logger(
@@ -79,8 +45,7 @@ class BilibiliDownloader():
             self.config.log_config['format']
         )
     
-    def _download(self, bv_id: str, output_dir: Path, video_info: dict,
-                 only_video: bool = False, only_audio: bool = False) -> Optional[Path]:
+    def _download(self, video_info: dict) -> Optional[Path]:
         """Process video download and merging"""
         try:
             # Get stream info
@@ -88,10 +53,10 @@ class BilibiliDownloader():
             dir_name = video_info.get('owner', {}).get('name')
             file_name = video_info.get('title')
             
-            video_stream_info = get_video_stream_info(self.config, bv_id, cid, self.config.sessdata)
+            video_stream_info = get_video_stream_info(self.config, self.bv_id, cid, self.config.sessdata)
             
             # Save stream info
-            with open(output_dir / 'video_stream_info.json', 'w', encoding='utf-8') as file:
+            with open(self.config.data_dir / 'video_stream_info.json', 'w', encoding='utf-8') as file:
                 json.dump(video_stream_info, file, ensure_ascii=False, indent=2)
             
             accepted_quality = get_accepted_video_quality(video_stream_info)
@@ -122,26 +87,26 @@ class BilibiliDownloader():
             log_info(f"Quality of the video to be downloaded: {video_quality}")
             
             # Create directory if it doesn't exist
-            dir_name = output_dir / dir_name
+            dir_name = self.output_dir / dir_name
             dir_name.mkdir(parents=True, exist_ok=True)
             
             log_info("Starting parallel download of video and audio...")
             try:
                 video_input_file, audio_input_file = parallel_download(
-                    self.config, bv_id, video_url, audio_url, self.config.temp_dir,
-                    only_video, only_audio
+                    self.config, self.bv_id, video_url, audio_url, self.config.data_dir,
+                    self.only_video, self.only_audio
                 )
-                if not video_input_file and not only_audio:
+                if not video_input_file and not self.only_audio:
                     raise FileNotFoundError("Video file not downloaded")
-                if not audio_input_file and not only_video:
+                if not audio_input_file and not self.only_video:
                     raise FileNotFoundError("Audio file not downloaded")
             except Exception as e:
                 log_error(f"Error during parallel download: {str(e)}")
                 return None
 
-            if only_video:
+            if self.only_video:
                 output_file = dir_name / f'{file_name}_video_only{self.config.get_file_extension("output")}'
-            elif only_audio:
+            elif self.only_audio:
                 output_file = dir_name / f'{file_name}_audio_only{self.config.get_file_extension("output")}'
             else:
                 output_file = dir_name / f'{file_name}{self.config.get_file_extension("output")}'
@@ -151,15 +116,15 @@ class BilibiliDownloader():
                 log_info(f"Merging files into: {output_file}")
                 
                 # Check if input files exist
-                if not video_input_file.exists() or (not only_video and not audio_input_file.exists()):
+                if not video_input_file.exists() or (not self.only_video and not audio_input_file.exists()):
                     raise FileNotFoundError("Input files not found")
                 
                 if output_file.exists():
                     output_file.unlink()
                     log_info(f"Deleted existing output file: {output_file}")
                 
-                if only_video or only_audio:
-                    input_file = video_input_file if only_video else audio_input_file
+                if self.only_video or self.only_audio:
+                    input_file = video_input_file if self.only_video else audio_input_file
                     cmd = [
                         'ffmpeg',
                         '-i', input_file,
@@ -209,29 +174,21 @@ class BilibiliDownloader():
     def _download_video(self) -> Optional[Path]:
         try:
             log_info(f"Bilibili Downloader v{__version__}")
-            
-            bv_id = self.args.bvid
-            output_dir = self.args.output
-            
-            only_info = self.args.only_info
-            
-            only_video = self.args.only_video
-            only_audio = self.args.only_audio
 
             if not self.config.sessdata:
                 log_error("Error: SESSDATA not configured in config/user.yaml")
                 return
             
-            output_dir.mkdir(parents=True, exist_ok=True)
+            self.output_dir.mkdir(parents=True, exist_ok=True)
             
             # Get video info
-            video_info = get_video_info(self.config, bv_id, self.config.sessdata)
+            video_info = get_video_info(self.config, self.bv_id, self.config.sessdata)
             if "error" in video_info:
                 log_error(f"Error: {video_info['error']}")
                 return
             
             # Save video info
-            with open(output_dir / 'video_info.json', 'w', encoding='utf-8') as file:
+            with open(self.config.data_dir / 'video_info.json', 'w', encoding='utf-8') as file:
                 json.dump(video_info, file, ensure_ascii=False, indent=2)
             
             # Print video information
@@ -241,12 +198,12 @@ class BilibiliDownloader():
             log_info(f"Uploader: {video_info.get('owner', {}).get('name')}")
             log_info(f"Duration: {video_info.get('duration')} seconds")
             
-            if only_info:
+            if self.only_info:
                 log_info("Video information and stream URLs saved to files.")
                 log_info("Only info flag is set. Skipping download.")
                 return None
             
-            return self._download(bv_id, output_dir, video_info, only_video, only_audio)
+            return self._download(video_info)
         except Exception as e:
             log_error(f"Unhandled error: {e}")
             return None

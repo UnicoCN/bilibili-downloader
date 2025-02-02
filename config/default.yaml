@@ -6,7 +6,6 @@ paths:
   downloads: "downloads"
   logs: "logs"
   data: "data"
-  temp: "data/temp"
 
 logging:
   filename: "bilibili_downloader.log"

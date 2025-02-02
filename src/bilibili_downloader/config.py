@@ -15,7 +15,6 @@ class Config:
     def _setup_paths(self) -> None:
         """Setup all path attributes using config values"""
         self.data_dir = self.root_dir / self.config['paths']['data']
-        self.temp_dir = self.root_dir / self.config['paths']['temp']
         self.downloads_dir = self.root_dir / self.config['paths']['downloads']
         self.logs_dir = self.root_dir / self.config['paths']['logs']
 
@@ -46,7 +45,7 @@ class Config:
 
     def setup_directories(self) -> None:
         """Create necessary directories"""
-        dirs = [self.data_dir, self.temp_dir, self.downloads_dir, self.logs_dir]
+        dirs = [self.data_dir, self.downloads_dir, self.logs_dir]
         for dir_path in dirs:
             dir_path.mkdir(parents=True, exist_ok=True)
 
