@@ -35,13 +35,12 @@ class Config:
                 self._deep_update(self.config, user_settings)
 
     def _deep_update(self, d: Dict, u: Dict) -> None:
-        """Recursively update nested dictionaries"""
+        """Recursively update nested dictionaries for merging user.yaml into default.yaml"""
         for k, v in u.items():
-            if isinstance(v, dict):
-                d[k] = self._deep_update(d.get(k, {}), v)
+            if k in d and isinstance(d[k], dict) and isinstance(v, dict):
+                self._deep_update(d[k], v)
             else:
                 d[k] = v
-        return d
 
     def setup_directories(self) -> None:
         """Create necessary directories"""
@@ -84,4 +83,3 @@ class Config:
             "Origin": self.get_http_header("origin")
         }
         return headers
-
