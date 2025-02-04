@@ -98,7 +98,8 @@ def download_file(config: Config, bv_id: str, url: str, output_path: Path, desc:
     
     @retry_with_backoff(retries=5, backoff_in_seconds=1, desc="Getting file size")
     def get_file_size():
-        response = requests.head(url, headers=config.get_headers_for_video(bv_id))
+        # If only request header, it may return 404 Not Found
+        response = requests.get(url, headers=config.get_headers_for_video(bv_id), stream=True)
         response.raise_for_status()
         return int(response.headers.get('content-length', 0))
 
