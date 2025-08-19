@@ -1,5 +1,4 @@
 import json
-import argparse
 import subprocess
 from pathlib import Path
 from typing import Optional

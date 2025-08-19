@@ -1,0 +1,11 @@
+[project]
+name = "bilibili-downloader"
+version = "0.1.0"
+description = "simple command line tool to donwload videos from bilibili"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.31.0",
+    "tqdm>=4.66.1",
+    "pyyaml>=6.0.1"
+]

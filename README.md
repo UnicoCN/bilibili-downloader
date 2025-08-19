@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](LICENSE)
 
 A simple Python tool for downloading high-quality videos from [Bilibili](https://www.bilibili.com).
@@ -24,31 +24,45 @@ Bilibili Video Downloader is a command-line tool that allows you to download vid
 
 ## 🛠️ Prerequisites
 
-- Python 3.7 or higher
+- Python 3.12 or higher
 - FFmpeg (must be installed and accessible in system PATH)
 - Valid Bilibili account cookies (for accessing restricted content)
-- pip (Python package manager)
+- [uv](https://github.com/astral-sh/uv) 
 
 ## ⚡ Quick Start
 
-1. **Clone the Repository**
+1. **Install uv (if not already installed)**
+   ```bash
+   # On macOS and Linux.
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+   ```bash
+   # On Windows.
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+   ```bash
+   # Or using pip
+   pip install uv
+   ```
+
+2. **Clone the Repository**
    ```bash
    git clone https://github.com/yourusername/bilibili-downloader.git
    cd bilibili-downloader
    ```
 
-2. **Install Dependencies**
+3. **Install Dependencies**
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
-3. **Configure Settings**
+4. **Configure Settings**
    - Copy `config/default.yaml` to `config/user.yaml`
    - Add your Bilibili cookie as "SESSDATA" to `user.yaml`
 
-4. **Basic Usage**
+5. **Basic Usage**
    ```bash
-   python main.py -id BV1xx411c7mD
+   uv run main.py -id BV1xx411c7mD
    ```
 
 ## 🎮 Usage Guide
@@ -56,7 +70,7 @@ Bilibili Video Downloader is a command-line tool that allows you to download vid
 ### Command Options
 
 ```bash
-python main.py [OPTIONS]
+uv run main.py [OPTIONS]
 
 Options:
   -id, --bvid TEXT     Bilibili video BV ID (Required)
@@ -71,17 +85,17 @@ Options:
 
 1. **Download to Custom Directory**
    ```bash
-   python main.py -id BV1xx411c7mD -o ~/Videos/bilibili
+   uv run main.py -id BV1xx411c7mD -o ~/Videos/bilibili
    ```
 
 2. **Extract Video Information Only**
    ```bash
-   python main.py -id BV1xx411c7mD --only-info
+   uv run main.py -id BV1xx411c7mD --only-info
    ```
 
 3. **Download Audio Stream Only**
    ```bash
-   python main.py -id BV1xx411c7mD --only-audio
+   uv run main.py -id BV1xx411c7mD --only-audio
    ```
 
 ## 📁 Project Structure
@@ -94,7 +108,9 @@ bilibili-downloader/
 ├── downloads/         # Downloaded videos
 ├── logs/             # Application logs
 ├── src/              # Source code
-└── data/             # Temporary data storage
+├── data/             # Temporary data storage
+├── pyproject.toml    # Project configuration and dependencies
+└── uv.lock          # Dependency lock file
 ```
 
 ## 🔧 Configuration
