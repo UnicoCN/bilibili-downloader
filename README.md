@@ -47,7 +47,7 @@ Bilibili Video Downloader is a command-line tool that allows you to download vid
 
 2. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/bilibili-downloader.git
+   git clone https://github.com/UnicoCN/bilibili-downloader.git
    cd bilibili-downloader
    ```
 
