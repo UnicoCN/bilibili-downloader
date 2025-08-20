@@ -141,4 +141,4 @@ If you find this project helpful, please consider giving it a star ⭐ on GitHub
 
 ## 📧 Contact
 
-For bug reports or feature requests, please use the [GitHub Issues](https://github.com/yourusername/bilibili-downloader/issues) page.
+For bug reports or feature requests, please use the [GitHub Issues](https://github.com/UnicoCN/bilibili-downloader/issues) page.
