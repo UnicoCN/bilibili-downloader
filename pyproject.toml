@@ -1,11 +1,20 @@
 [project]
 name = "bilibili-downloader"
 version = "0.1.0"
-description = "simple command line tool to donwload videos from bilibili"
+description = "simple command line tool to download videos from bilibili"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "requests>=2.31.0",
     "tqdm>=4.66.1",
     "pyyaml>=6.0.1"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.1",
+    "mypy>=1.5.0",
+    "ruff>=0.1.0",
 ]

@@ -2,7 +2,7 @@ import time
 import random
 from functools import wraps
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -12,7 +12,7 @@ from requests.exceptions import RequestException, ConnectionError
 from ..config import Config
 from .logger import log_info, log_error
 
-def retry_with_backoff(retries=5, backoff_in_seconds=1, desc='Unknown'):
+def retry_with_backoff(retries: int = 5, backoff_in_seconds: float = 1, desc: str = 'Unknown'):
     """Retry decorator with exponential backoff"""
     def decorator(func):
         @wraps(func)
@@ -32,7 +32,7 @@ def retry_with_backoff(retries=5, backoff_in_seconds=1, desc='Unknown'):
         return wrapper
     return decorator
 
-def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict:
+def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict[str, Any]:
     """Fetch video information from Bilibili"""
     try:
         response = requests.get(
@@ -51,7 +51,7 @@ def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict:
         log_error(f"Error fetching video information: {e}")
         return {"error": str(e)}
 
-def get_video_stream_info(config: Config, bv_id, cid, my_cookie):
+def get_video_stream_info(config: Config, bv_id: str, cid: str, my_cookie: str) -> Dict[str, Any]:
     """Fetch video stream information from Bilibili.
     
     Args:
@@ -185,7 +185,7 @@ def parallel_download(config: Config, bv_id: str, video_url: str, audio_url: str
             
     return video_path, audio_path
 
-def get_accepted_video_quality(video_stream_info):
+def get_accepted_video_quality(video_stream_info: Dict[str, Any]) -> Dict[int, str]:
     """Get the accepted quality of the video stream.
     
     Args:

@@ -113,56 +113,55 @@ class BilibiliDownloader():
             log_info("Merging video and audio...")
             try:
                 log_info(f"Merging files into: {output_file}")
-                
+
                 # Check if input files exist
-                if not video_input_file.exists() or (not self.only_video and not audio_input_file.exists()):
-                    raise FileNotFoundError("Input files not found")
-                
+                if video_input_file and not video_input_file.exists():
+                    raise FileNotFoundError(f"Video file not found: {video_input_file}")
+                if audio_input_file and not audio_input_file.exists() and not self.only_video:
+                    raise FileNotFoundError(f"Audio file not found: {audio_input_file}")
+
                 if output_file.exists():
                     output_file.unlink()
                     log_info(f"Deleted existing output file: {output_file}")
-                
+
                 if self.only_video or self.only_audio:
                     input_file = video_input_file if self.only_video else audio_input_file
                     cmd = [
                         'ffmpeg',
-                        '-i', input_file,
+                        '-i', str(input_file),
                         '-c', 'copy',
-                        output_file
+                        str(output_file)
                     ]
                 else:
                     cmd = [
                         'ffmpeg',
-                        '-i', video_input_file,
-                        '-i', audio_input_file,
+                        '-i', str(video_input_file),
+                        '-i', str(audio_input_file),
                         '-c:v', 'copy',
                         '-c:a', 'copy',
                         '-f', 'mp4',
-                        output_file
+                        str(output_file)
                     ]
-                
+
                 # Run FFmpeg command
                 subprocess.run(cmd, check=True, capture_output=True)
-                
-                # Clean up temporary files
-                try:
-                    if video_input_file and video_input_file.exists():
-                        video_input_file.unlink()
-                        log_info(f"Cleaned up temporary video file: {video_input_file}")
-                        
-                    if audio_input_file and audio_input_file.exists():
-                        audio_input_file.unlink()
-                        log_info(f"Cleaned up temporary audio file: {audio_input_file}")
-                        
-                except Exception as e:
-                    log_error(f"Warning: Failed to clean up temporary files: {e}")
-                
                 log_info(f"Download completed! File saved as: {output_file}")
-            
+
             except subprocess.CalledProcessError as e:
                 log_error(f"Error: Failed to merge video and audio files: {e}")
+                raise
             except Exception as e:
-                log_error(f"Error during cleanup: {str(e)}")
+                log_error(f"Error during merge: {str(e)}")
+                raise
+            finally:
+                # Clean up temporary files - always execute even if merge fails
+                for temp_file, file_type in [(video_input_file, 'video'), (audio_input_file, 'audio')]:
+                    if temp_file and temp_file.exists():
+                        try:
+                            temp_file.unlink()
+                            log_info(f"Cleaned up temporary {file_type} file: {temp_file}")
+                        except Exception as e:
+                            log_error(f"Warning: Failed to clean up temporary {file_type} file {temp_file}: {e}")
             
             return output_file
             
@@ -175,8 +174,11 @@ class BilibiliDownloader():
             log_info(f"Bilibili Downloader v{__version__}")
 
             if not self.config.sessdata:
-                log_error("Error: SESSDATA not configured in config/user.yaml")
-                return
+                log_error("Error: SESSDATA not configured")
+                log_error("Please set SESSDATA via:")
+                log_error("  1. Environment variable: export BILIBILI_SESSDATA='your_sessdata'")
+                log_error("  2. Config file: config/user.yaml")
+                raise RuntimeError("SESSDATA not configured. Cannot proceed with download.")
             
             self.output_dir.mkdir(parents=True, exist_ok=True)
             

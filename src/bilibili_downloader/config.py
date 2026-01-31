@@ -1,3 +1,4 @@
+import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any
@@ -64,8 +65,27 @@ class Config:
 
     @property
     def sessdata(self) -> str:
-        """Get SESSDATA from user config"""
-        return self.config['user']['sessdata']
+        """Get SESSDATA from environment variable or user config.
+
+        Priority:
+        1. Environment variable BILIBILI_SESSDATA
+        2. user.yaml configuration
+        3. default.yaml (usually empty)
+
+        Returns:
+            SESSDATA cookie value
+        """
+        # First check environment variable (most secure)
+        env_sessdata = os.getenv('BILIBILI_SESSDATA')
+        if env_sessdata:
+            return env_sessdata
+
+        # Fall back to config file
+        config_sessdata = self.config['user'].get('sessdata', '')
+        if config_sessdata and config_sessdata != 'your_sessdata_here':
+            return config_sessdata
+
+        return ''
 
     def get_file_extension(self, name: str) -> str:
         """Get file extension by name"""
