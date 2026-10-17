@@ -182,32 +182,25 @@ def download_file(config: Config, bv_id: str, url: str, output_path: Path, desc:
         raise DownloadError(f"Downloaded file size mismatch for {output_path}")
     log_info(f"Downloaded file: {output_path} completed with size: {file_size}")
 
-def parallel_download(config: Config, bv_id: str, video_url: str, audio_url: str, output_dir: Path, 
-                     only_video: bool = False, only_audio: bool = False) -> Tuple[Optional[Path], Optional[Path]]:
-    """Download video and audio files in parallel"""
-    video_path = None
-    audio_path = None
-    
+def parallel_download(config: Config, bv_id: str,
+                      video_url: Optional[str], video_path: Optional[Path],
+                      audio_url: Optional[str], audio_path: Optional[Path]) -> None:
+    """Download video and audio files in parallel; a stream is skipped when its URL or path is None"""
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = []
-        
-        if not only_audio:
-            video_path = output_dir / f'video{config.get_file_extension("video")}'
+
+        if video_url and video_path:
             futures.append(
                 executor.submit(download_file, config, bv_id, video_url, video_path, "Downloading video")
             )
-        
-        if not only_video:
-            audio_path = output_dir / f'audio{config.get_file_extension("audio")}'
+
+        if audio_url and audio_path:
             futures.append(
                 executor.submit(download_file, config, bv_id, audio_url, audio_path, "Downloading audio")
             )
-        
-        # Wait for all downloads to complete
+
         for future in futures:
             future.result()
-            
-    return video_path, audio_path
 
 def get_accepted_video_quality(video_stream_info: Dict[str, Any]) -> Dict[int, str]:
     """Get the accepted quality of the video stream.

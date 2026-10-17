@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,8 @@ from .utils.downloader import (
 
 __version__ = "1.0.0"
 
+BV_ID_PATTERN = re.compile(r"BV[0-9A-Za-z]{10}")
+
 class BilibiliDownloader():
 
     def __init__(self, config_path: Path):
@@ -30,7 +33,10 @@ class BilibiliDownloader():
         Raises:
             BilibiliDownloaderError: When fetching, downloading or merging fails
             RuntimeError: When SESSDATA is not configured
+            ValueError: When bv_id is not a valid BV ID
         """
+        if not BV_ID_PATTERN.fullmatch(bv_id):
+            raise ValueError(f"Invalid BV ID: {bv_id!r} (expected e.g. BV1xx411c7mD)")
         self._set_logger()
 
         self.bv_id = bv_id
@@ -68,7 +74,7 @@ class BilibiliDownloader():
 
         video_stream_info = get_video_stream_info(self.config, self.bv_id, cid, self.config.sessdata)
 
-        with open(self.config.data_dir / 'video_stream_info.json', 'w', encoding='utf-8') as file:
+        with open(self.config.data_dir / f'{self.bv_id}_video_stream_info.json', 'w', encoding='utf-8') as file:
             json.dump(video_stream_info, file, ensure_ascii=False, indent=2)
 
         accepted_quality = get_accepted_video_quality(video_stream_info)
@@ -79,7 +85,11 @@ class BilibiliDownloader():
         video_streams = dash.get('video') or []
         audio_streams = dash.get('audio') or []
 
+        # Temp files are keyed by video, part and stream so a leftover partial file is only
+        # ever resumed by a download of exactly the same stream
+        temp_prefix = f"{self.bv_id}_{cid}"
         video_url = audio_url = None
+        video_input_file = audio_input_file = None
         if not self.only_audio:
             if not video_streams:
                 raise BilibiliAPIError("No DASH video stream available for this video")
@@ -87,6 +97,10 @@ class BilibiliDownloader():
             video_url = video_stream.get('baseUrl') or video_stream.get('base_url')
             if not video_url:
                 raise BilibiliAPIError("Selected video stream has no URL")
+            video_input_file = self.config.data_dir / (
+                f"{temp_prefix}_video_{video_stream.get('id', 0)}_{video_stream.get('codecid', 0)}"
+                f"{self.config.get_file_extension('video')}"
+            )
             video_quality = accepted_quality.get(video_stream.get('id', 0), 'Unknown')
             log_info(f"Quality of the video to be downloaded: {video_quality}")
         if not self.only_video:
@@ -96,19 +110,20 @@ class BilibiliDownloader():
             audio_url = audio_stream.get('baseUrl') or audio_stream.get('base_url')
             if not audio_url:
                 raise BilibiliAPIError("Selected audio stream has no URL")
+            audio_input_file = self.config.data_dir / (
+                f"{temp_prefix}_audio_{audio_stream.get('id', 0)}{self.config.get_file_extension('audio')}"
+            )
 
         dir_name = self.output_dir / dir_name
         dir_name.mkdir(parents=True, exist_ok=True)
 
         log_info("Starting parallel download of video and audio...")
-        video_input_file, audio_input_file = parallel_download(
-            self.config, self.bv_id, video_url, audio_url, self.config.data_dir,
-            self.only_video, self.only_audio
+        parallel_download(
+            self.config, self.bv_id, video_url, video_input_file, audio_url, audio_input_file
         )
-        if not self.only_audio and not (video_input_file and video_input_file.exists()):
-            raise DownloadError(f"Video file not downloaded: {video_input_file}")
-        if not self.only_video and not (audio_input_file and audio_input_file.exists()):
-            raise DownloadError(f"Audio file not downloaded: {audio_input_file}")
+        for temp_file in (video_input_file, audio_input_file):
+            if temp_file and not temp_file.exists():
+                raise DownloadError(f"Stream file not downloaded: {temp_file}")
 
         if self.only_video:
             output_file = dir_name / f'{file_name}_video_only{self.config.get_file_extension("output")}'
@@ -159,7 +174,7 @@ class BilibiliDownloader():
 
         video_info = get_video_info(self.config, self.bv_id, self.config.sessdata)
 
-        with open(self.config.data_dir / 'video_info.json', 'w', encoding='utf-8') as file:
+        with open(self.config.data_dir / f'{self.bv_id}_video_info.json', 'w', encoding='utf-8') as file:
             json.dump(video_info, file, ensure_ascii=False, indent=2)
 
         log_info("Video Information:")

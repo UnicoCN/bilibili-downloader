@@ -8,6 +8,7 @@ from src.bilibili_downloader import bilibili_downloader as module
 from src.bilibili_downloader.bilibili_downloader import BilibiliDownloader
 from src.bilibili_downloader.exceptions import BilibiliAPIError, MergeError
 
+BV_ID = "BV1xx411c7mD"
 VIDEO_INFO = {"cid": 123, "title": "Title", "owner": {"name": "Uploader"}, "duration": 10}
 STREAM_INFO = {
     "accept_quality": [80, 64],
@@ -39,15 +40,10 @@ def downloader(tmp_path):
     return instance
 
 
-def _fake_parallel_download(config, bv_id, video_url, audio_url, output_dir, only_video, only_audio):
-    video_path = audio_path = None
-    if not only_audio:
-        video_path = output_dir / "video.m4s"
-        video_path.write_bytes(b"v")
-    if not only_video:
-        audio_path = output_dir / "audio.m4s"
-        audio_path.write_bytes(b"a")
-    return video_path, audio_path
+def _fake_parallel_download(config, bv_id, video_url, video_path, audio_url, audio_path):
+    for url, path in ((video_url, video_path), (audio_url, audio_path)):
+        if url and path:
+            path.write_bytes(b"data")
 
 
 class TestBilibiliDownloader:
@@ -57,30 +53,49 @@ class TestBilibiliDownloader:
              patch.object(module, "get_video_stream_info", return_value=STREAM_INFO), \
              patch.object(module, "parallel_download", side_effect=_fake_parallel_download) as pd, \
              patch.object(module.subprocess, "run") as run:
-            output = downloader.download("BV1")
+            output = downloader.download(BV_ID)
 
         assert output == downloader.config.downloads_dir / "Uploader" / "Title.mp4"
-        assert pd.call_args.args[2] == "https://cdn/v80"
+        _, _, video_url, video_path, audio_url, audio_path = pd.call_args.args
+        assert video_url == "https://cdn/v80"
+        assert video_path.name.startswith(f"{BV_ID}_123_video_80")
+        assert audio_path.name.startswith(f"{BV_ID}_123_audio_30280")
         cmd = run.call_args.args[0]
         assert cmd[0] == "ffmpeg" and "-y" in cmd and cmd[-1] == str(output)
         assert not list(downloader.config.data_dir.glob("*.m4s"))
 
+    def test_leftover_file_from_other_video_is_not_reused(self, downloader):
+        stale = downloader.config.data_dir / "BV9zz999z9zZ_456_video_80_0.m4s"
+        stale.write_bytes(b"other video")
+        with patch.object(module, "get_video_info", return_value=dict(VIDEO_INFO)), \
+             patch.object(module, "get_video_stream_info", return_value=STREAM_INFO), \
+             patch.object(module, "parallel_download", side_effect=_fake_parallel_download) as pd, \
+             patch.object(module.subprocess, "run"):
+            downloader.download(BV_ID)
+        assert pd.call_args.args[3] != stale
+        assert stale.read_bytes() == b"other video"
+
+    @pytest.mark.parametrize("bad_id", ["", "../../etc", "BV1xx411c7mD/../x", "av12345"])
+    def test_invalid_bv_id_rejected(self, downloader, bad_id):
+        with pytest.raises(ValueError, match="Invalid BV ID"):
+            downloader.download(bad_id)
+
     def test_missing_sessdata_raises(self, downloader):
         downloader.config.sessdata = ""
         with pytest.raises(RuntimeError, match="SESSDATA"):
-            downloader.download("BV1")
+            downloader.download(BV_ID)
 
     def test_api_error_propagates(self, downloader):
         with patch.object(module, "get_video_info", side_effect=BilibiliAPIError("boom")):
             with pytest.raises(BilibiliAPIError, match="boom"):
-                downloader.download("BV1")
+                downloader.download(BV_ID)
 
     def test_missing_audio_stream_raises(self, downloader):
         stream_info = {"dash": {"video": STREAM_INFO["dash"]["video"], "audio": None}}
         with patch.object(module, "get_video_info", return_value=dict(VIDEO_INFO)), \
              patch.object(module, "get_video_stream_info", return_value=stream_info):
             with pytest.raises(BilibiliAPIError, match="audio"):
-                downloader.download("BV1")
+                downloader.download(BV_ID)
 
     def test_only_video_does_not_require_audio_stream(self, downloader):
         stream_info = {"dash": {"video": STREAM_INFO["dash"]["video"], "audio": None}}
@@ -88,7 +103,7 @@ class TestBilibiliDownloader:
              patch.object(module, "get_video_stream_info", return_value=stream_info), \
              patch.object(module, "parallel_download", side_effect=_fake_parallel_download), \
              patch.object(module.subprocess, "run"):
-            output = downloader.download("BV1", only_video=True)
+            output = downloader.download(BV_ID, only_video=True)
         assert output.name == "Title_video_only.mp4"
 
     def test_ffmpeg_failure_raises_merge_error_and_cleans_up(self, downloader):
@@ -98,5 +113,5 @@ class TestBilibiliDownloader:
              patch.object(module, "parallel_download", side_effect=_fake_parallel_download), \
              patch.object(module.subprocess, "run", side_effect=error):
             with pytest.raises(MergeError, match="Invalid data"):
-                downloader.download("BV1")
+                downloader.download(BV_ID)
         assert not list(downloader.config.data_dir.glob("*.m4s"))

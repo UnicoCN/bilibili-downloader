@@ -76,7 +76,7 @@ def main() -> int:
 
         if args.only_info:
             print("✓ Video information fetched successfully")
-            print("  Check data/video_info.json for details")
+            print(f"  Check data/{args.bvid}_video_info.json for details")
             return 0
 
         if video_file and video_file.exists():
@@ -88,7 +88,7 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\n✗ Download cancelled by user")
         return 1
-    except (BilibiliDownloaderError, FileNotFoundError, RuntimeError) as e:
+    except (BilibiliDownloaderError, FileNotFoundError, RuntimeError, ValueError) as e:
         get_logger().error(f"✗ {type(e).__name__}: {e}")
         return 1
     except Exception as e:
