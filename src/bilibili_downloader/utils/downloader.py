@@ -13,6 +13,10 @@ from ..config import Config
 from ..exceptions import BilibiliAPIError, DownloadError
 from .logger import log_info, log_error
 
+# (connect, read) timeout in seconds; read timeout applies per socket read, not to the whole download
+REQUEST_TIMEOUT = (10, 30)
+CHUNK_SIZE = 1024 * 1024
+
 def retry_with_backoff(retries: int = 5, backoff_in_seconds: float = 1, desc: str = 'Unknown'):
     """Retry decorator with exponential backoff"""
     def decorator(func):
@@ -40,7 +44,7 @@ def _call_api(url: str, description: str, **kwargs: Any) -> Dict[str, Any]:
         BilibiliAPIError: On network failure, invalid JSON or a non-zero API code
     """
     try:
-        response = requests.get(url, **kwargs)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT, **kwargs)
         response.raise_for_status()
         data = response.json()
     except (RequestException, ValueError) as e:
@@ -93,66 +97,86 @@ def get_video_stream_info(config: Config, bv_id: str, cid: str, my_cookie: str) 
         cookies=cookies,
     )
 
-def download_file(config: Config, bv_id: str, url: str, output_path: Path, desc: Optional[str] = None) -> None:
-    """Download file with progress bar and resume capability"""
-    
-    @retry_with_backoff(retries=5, backoff_in_seconds=1, desc="Getting file size")
-    def get_file_size():
-        # If only request header, it may return 404 Not Found
-        response = requests.get(url, headers=config.get_headers_for_video(bv_id), stream=True)
-        response.raise_for_status()
-        return int(response.headers.get('content-length', 0))
+def download_file(config: Config, bv_id: str, url: str, output_path: Path, desc: Optional[str] = None,
+                  max_attempts: int = 5) -> None:
+    """Download file with progress bar and resume capability.
 
-    file_size = get_file_size()
-    initial_pos = 0
-    
-    # Check if partial download exists
-    if output_path.exists():
-        initial_pos = output_path.stat().st_size
-        if initial_pos >= file_size:
-            log_info(f"File {output_path} already completely downloaded")
-            return
-        else:
-            log_info(f"Resuming download from byte {initial_pos}")
+    Args:
+        max_attempts: Consecutive attempts without any progress before giving up
+
+    Raises:
+        DownloadError: When the file cannot be fully downloaded
+        RequestException: When the server keeps rejecting requests
+    """
+    headers = config.get_headers_for_video(bv_id)
+
+    @retry_with_backoff(retries=5, backoff_in_seconds=1, desc="Opening download stream")
+    def open_stream(pos: int) -> requests.Response:
+        request_headers = {**headers, 'Range': f'bytes={pos}-'} if pos > 0 else headers
+        response = requests.get(url, headers=request_headers, stream=True, timeout=REQUEST_TIMEOUT)
+        try:
+            response.raise_for_status()
+        except RequestException:
+            response.close()
+            raise
+        return response
+
+    # A HEAD request may return 404, so read the size from a streamed GET and close it without the body
+    with open_stream(0) as response:
+        file_size = int(response.headers.get('content-length', 0))
+    if file_size <= 0:
+        raise DownloadError(f"Server did not report a size for {output_path.name}")
+
+    initial_pos = output_path.stat().st_size if output_path.exists() else 0
+    if initial_pos == file_size:
+        log_info(f"File {output_path} already completely downloaded")
+        return
+    if initial_pos > file_size:
+        log_info(f"Existing file {output_path} is larger than expected, restarting download")
+        initial_pos = 0
+    elif initial_pos > 0:
+        log_info(f"Resuming download from byte {initial_pos}")
 
     progress_desc = desc if desc else output_path.name
-    
-    @retry_with_backoff(retries=5, backoff_in_seconds=1, desc="Downloading file chunks")
-    def download_chunk(pos):
-        # Update headers with current position for each chunk request
-        headers = config.get_headers_for_video()
-        if pos > 0:
-            headers['Range'] = f'bytes={pos}-'
-        response = requests.get(url, headers=headers, stream=True)
-        
-        # If resuming, server should return 206 Partial Content
-        if pos > 0 and response.status_code != 206:
-            raise RequestException("Server doesn't support resume")
-            
-        response.raise_for_status()
-        return response
-    
-    with tqdm(total=file_size, initial=initial_pos, unit='B', 
+
+    with tqdm(total=file_size, initial=initial_pos, unit='B',
               unit_scale=True, desc=progress_desc, colour='green') as pbar:
-        
+
         current_pos = initial_pos
+        failures = 0
         while current_pos < file_size:
+            written = 0
             try:
-                response = download_chunk(current_pos)
-                # Open in append mode if resuming, write mode if starting fresh
-                mode = 'ab' if current_pos > 0 else 'wb'
-                with open(output_path, mode) as f:
-                    for chunk in response.iter_content(chunk_size=4*1024*1024):
-                        if chunk:
-                            size = f.write(chunk)
-                            pbar.update(size)
-                            current_pos += size
-            except Exception as e:
-                log_error(f"Error during download: {str(e)}")
-                if current_pos < file_size:
-                    log_info(f"Will retry download from position {current_pos}")
-                    time.sleep(1)
-    
+                with open_stream(current_pos) as response:
+                    if current_pos > 0 and response.status_code != 206:
+                        log_info("Server ignored the Range header, restarting download from the beginning")
+                        current_pos = 0
+                        pbar.reset(total=file_size)
+                    mode = 'ab' if current_pos > 0 else 'wb'
+                    with open(output_path, mode) as f:
+                        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+                            if chunk:
+                                size = f.write(chunk)
+                                pbar.update(size)
+                                current_pos += size
+                                written += size
+            except RequestException as e:
+                log_error(f"Error during download: {e}")
+
+            if current_pos > file_size:
+                raise DownloadError(f"Received more data than expected for {output_path}")
+            if current_pos == file_size:
+                break
+
+            failures = 0 if written else failures + 1
+            if failures >= max_attempts:
+                raise DownloadError(
+                    f"Download of {output_path.name} stalled at byte {current_pos}/{file_size} "
+                    f"after {max_attempts} attempts"
+                )
+            log_info(f"Will retry download from position {current_pos}")
+            time.sleep(1)
+
     # Verify file size after download
     if output_path.stat().st_size != file_size:
         raise DownloadError(f"Downloaded file size mismatch for {output_path}")
