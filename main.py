@@ -30,19 +30,21 @@ def create_parser() -> argparse.ArgumentParser:
         help='Output directory for downloaded files (default: downloads/)'
     )
 
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+
+    mode.add_argument(
         '--only-info',
         action='store_true',
-        help='Only fetch video information and stream URLs'
+        help='Only fetch video information'
     )
 
-    parser.add_argument(
+    mode.add_argument(
         '--only-video',
         action='store_true',
         help='Only download the video stream (without audio)'
     )
 
-    parser.add_argument(
+    mode.add_argument(
         '--only-audio',
         action='store_true',
         help='Only download the audio stream (without video)'

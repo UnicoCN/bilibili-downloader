@@ -34,10 +34,12 @@ class BilibiliDownloader():
         Raises:
             BilibiliDownloaderError: When fetching, downloading or merging fails
             RuntimeError: When SESSDATA is not configured
-            ValueError: When bv_id is not a valid BV ID
+            ValueError: When bv_id is not a valid BV ID or both only_video and only_audio are set
         """
         if not BV_ID_PATTERN.fullmatch(bv_id):
             raise ValueError(f"Invalid BV ID: {bv_id!r} (expected e.g. BV1xx411c7mD)")
+        if only_video and only_audio:
+            raise ValueError("only_video and only_audio are mutually exclusive")
         self._set_logger()
 
         self.bv_id = bv_id

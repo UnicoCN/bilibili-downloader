@@ -86,6 +86,10 @@ class TestBilibiliDownloader:
         assert output.parent.parent == downloads
         assert output.resolve().is_relative_to(downloads.resolve())
 
+    def test_only_video_and_only_audio_rejected(self, downloader):
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            downloader.download(BV_ID, only_video=True, only_audio=True)
+
     @pytest.mark.parametrize("bad_id", ["", "../../etc", "BV1xx411c7mD/../x", "av12345"])
     def test_invalid_bv_id_rejected(self, downloader, bad_id):
         with pytest.raises(ValueError, match="Invalid BV ID"):
