@@ -29,6 +29,17 @@ class TestApi:
         with patch("requests.get", return_value=_json_response({"code": 0, "data": {"cid": 1}})):
             assert get_video_info(config, "BV1", "sess") == {"cid": 1}
 
+    def test_get_video_info_sends_sessdata_as_named_cookie(self, config):
+        with patch("requests.get", return_value=_json_response({"code": 0, "data": {}})) as get:
+            get_video_info(config, "BV1", "sess")
+        assert get.call_args.kwargs["cookies"] == {"SESSDATA": "sess"}
+        assert "Cookie" not in get.call_args.kwargs["headers"]
+
+    def test_get_video_info_without_sessdata_sends_no_cookie(self, config):
+        with patch("requests.get", return_value=_json_response({"code": 0, "data": {}})) as get:
+            get_video_info(config, "BV1")
+        assert get.call_args.kwargs["cookies"] is None
+
     def test_api_error_code_raises_with_message(self, config):
         payload = {"code": -404, "message": "啥都木有"}
         with patch("requests.get", return_value=_json_response(payload)):

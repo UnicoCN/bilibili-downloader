@@ -117,8 +117,8 @@ class BilibiliDownloader():
                 f"{temp_prefix}_audio_{audio_stream.get('id', 0)}{self.config.get_file_extension('audio')}"
             )
 
-        dir_name = self.output_dir / dir_name
-        dir_name.mkdir(parents=True, exist_ok=True)
+        output_subdir = self.output_dir / dir_name
+        output_subdir.mkdir(parents=True, exist_ok=True)
 
         log_info("Starting parallel download of video and audio...")
         parallel_download(
@@ -129,11 +129,11 @@ class BilibiliDownloader():
                 raise DownloadError(f"Stream file not downloaded: {temp_file}")
 
         if self.only_video:
-            output_file = dir_name / f'{file_name}_video_only{self.config.get_file_extension("output")}'
+            output_file = output_subdir / f'{file_name}_video_only{self.config.get_file_extension("output")}'
         elif self.only_audio:
-            output_file = dir_name / f'{file_name}_audio_only{self.config.get_file_extension("output")}'
+            output_file = output_subdir / f'{file_name}_audio_only{self.config.get_file_extension("output")}'
         else:
-            output_file = dir_name / f'{file_name}{self.config.get_file_extension("output")}'
+            output_file = output_subdir / f'{file_name}{self.config.get_file_extension("output")}'
 
         log_info(f"Merging files into: {output_file}")
         try:
@@ -166,14 +166,12 @@ class BilibiliDownloader():
     def _download_video(self) -> Optional[Path]:
         log_info(f"Bilibili Downloader v{__version__}")
 
-        if not self.config.sessdata:
+        if not self.only_info and not self.config.sessdata:
             log_error("Error: SESSDATA not configured")
             log_error("Please set SESSDATA via:")
             log_error("  1. Environment variable: export BILIBILI_SESSDATA='your_sessdata'")
             log_error("  2. Config file: config/user.yaml")
             raise RuntimeError("SESSDATA not configured. Cannot proceed with download.")
-
-        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         video_info = get_video_info(self.config, self.bv_id, self.config.sessdata)
 
@@ -187,8 +185,9 @@ class BilibiliDownloader():
         log_info(f"Duration: {video_info.get('duration')} seconds")
 
         if self.only_info:
-            log_info("Video information and stream URLs saved to files.")
+            log_info("Video information saved to file.")
             log_info("Only info flag is set. Skipping download.")
             return None
 
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         return self._download(video_info)

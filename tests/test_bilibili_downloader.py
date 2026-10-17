@@ -100,6 +100,13 @@ class TestBilibiliDownloader:
         with pytest.raises(RuntimeError, match="SESSDATA"):
             downloader.download(BV_ID)
 
+    def test_only_info_works_without_sessdata(self, downloader):
+        downloader.config.sessdata = ""
+        with patch.object(module, "get_video_info", return_value=dict(VIDEO_INFO)) as info:
+            assert downloader.download(BV_ID, only_info=True) is None
+        info.assert_called_once()
+        assert (downloader.config.data_dir / f"{BV_ID}_video_info.json").exists()
+
     def test_api_error_propagates(self, downloader):
         with patch.object(module, "get_video_info", side_effect=BilibiliAPIError("boom")):
             with pytest.raises(BilibiliAPIError, match="boom"):

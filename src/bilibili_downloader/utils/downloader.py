@@ -2,7 +2,7 @@ import time
 import random
 from functools import wraps
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -56,13 +56,14 @@ def _call_api(url: str, description: str, **kwargs: Any) -> Dict[str, Any]:
         )
     return data.get("data") or {}
 
-def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict[str, Any]:
-    """Fetch video information from Bilibili"""
+def get_video_info(config: Config, bv_id: str, sessdata: str = "") -> Dict[str, Any]:
+    """Fetch video information from Bilibili; SESSDATA is optional for this endpoint"""
     return _call_api(
         config.get_api_url("video_info"),
         "video information",
         params={"bvid": bv_id},
-        headers={**config.get_headers_for_video(), "Cookie": cookies},
+        headers=config.get_headers_for_video(),
+        cookies={"SESSDATA": sessdata} if sessdata else None,
     )
 
 def get_video_stream_info(config: Config, bv_id: str, cid: str, my_cookie: str) -> Dict[str, Any]:

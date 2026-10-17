@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 _INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f\x7f]')
 _WINDOWS_RESERVED = {
@@ -10,7 +11,7 @@ _WINDOWS_RESERVED = {
 MAX_NAME_BYTES = 200
 
 
-def sanitize_filename(name: str, fallback: str) -> str:
+def sanitize_filename(name: Optional[str], fallback: str) -> str:
     """Turn untrusted text (video title, uploader name) into a single safe path component.
 
     Path separators and characters invalid on Windows are replaced, leading/trailing dots and
