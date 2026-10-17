@@ -75,6 +75,17 @@ class TestBilibiliDownloader:
         assert pd.call_args.args[3] != stale
         assert stale.read_bytes() == b"other video"
 
+    def test_untrusted_title_and_uploader_stay_inside_output_dir(self, downloader):
+        video_info = {**VIDEO_INFO, "title": "../../evil/name", "owner": {"name": ".."}}
+        with patch.object(module, "get_video_info", return_value=video_info), \
+             patch.object(module, "get_video_stream_info", return_value=STREAM_INFO), \
+             patch.object(module, "parallel_download", side_effect=_fake_parallel_download), \
+             patch.object(module.subprocess, "run"):
+            output = downloader.download(BV_ID)
+        downloads = downloader.config.downloads_dir
+        assert output.parent.parent == downloads
+        assert output.resolve().is_relative_to(downloads.resolve())
+
     @pytest.mark.parametrize("bad_id", ["", "../../etc", "BV1xx411c7mD/../x", "av12345"])
     def test_invalid_bv_id_rejected(self, downloader, bad_id):
         with pytest.raises(ValueError, match="Invalid BV ID"):

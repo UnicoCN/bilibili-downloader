@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .config import Config
 from .exceptions import BilibiliAPIError, DownloadError, MergeError
+from .utils.filename import sanitize_filename
 from .utils.logger import log_info, log_error, setup_logger
 from .utils.downloader import (
     get_video_info,
@@ -69,8 +70,8 @@ class BilibiliDownloader():
         cid = video_info.get('cid')
         if not cid:
             raise BilibiliAPIError("Video information does not contain a cid")
-        dir_name = video_info.get('owner', {}).get('name')
-        file_name = video_info.get('title')
+        dir_name = sanitize_filename(video_info.get('owner', {}).get('name'), fallback='unknown_uploader')
+        file_name = sanitize_filename(video_info.get('title'), fallback=self.bv_id)
 
         video_stream_info = get_video_stream_info(self.config, self.bv_id, cid, self.config.sessdata)
 
