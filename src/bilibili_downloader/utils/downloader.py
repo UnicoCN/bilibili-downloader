@@ -10,6 +10,7 @@ from tqdm import tqdm
 from requests.exceptions import RequestException, ConnectionError
 
 from ..config import Config
+from ..exceptions import BilibiliAPIError, DownloadError
 from .logger import log_info, log_error
 
 def retry_with_backoff(retries: int = 5, backoff_in_seconds: float = 1, desc: str = 'Unknown'):
@@ -32,24 +33,33 @@ def retry_with_backoff(retries: int = 5, backoff_in_seconds: float = 1, desc: st
         return wrapper
     return decorator
 
-def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict[str, Any]:
-    """Fetch video information from Bilibili"""
+def _call_api(url: str, description: str, **kwargs: Any) -> Dict[str, Any]:
+    """Call a Bilibili JSON API and return its `data` field.
+
+    Raises:
+        BilibiliAPIError: On network failure, invalid JSON or a non-zero API code
+    """
     try:
-        response = requests.get(
-            config.get_api_url("video_info"),
-            params={"bvid": bv_id},
-            headers={**config.get_headers_for_video(), "Cookie": cookies}
-        )
+        response = requests.get(url, **kwargs)
         response.raise_for_status()
         data = response.json()
-        
-        if data.get("code") == 0:
-            return data.get("data", {})
-        else:
-            return {"error": data.get("message", "Unknown error")}
-    except requests.exceptions.RequestException as e:
-        log_error(f"Error fetching video information: {e}")
-        return {"error": str(e)}
+    except (RequestException, ValueError) as e:
+        raise BilibiliAPIError(f"Failed to fetch {description}: {e}") from e
+
+    if data.get("code") != 0:
+        raise BilibiliAPIError(
+            f"Failed to fetch {description}: {data.get('message', 'Unknown error')} (code {data.get('code')})"
+        )
+    return data.get("data") or {}
+
+def get_video_info(config: Config, bv_id: str, cookies: str) -> Dict[str, Any]:
+    """Fetch video information from Bilibili"""
+    return _call_api(
+        config.get_api_url("video_info"),
+        "video information",
+        params={"bvid": bv_id},
+        headers={**config.get_headers_for_video(), "Cookie": cookies},
+    )
 
 def get_video_stream_info(config: Config, bv_id: str, cid: str, my_cookie: str) -> Dict[str, Any]:
     """Fetch video stream information from Bilibili.
@@ -75,23 +85,13 @@ def get_video_stream_info(config: Config, bv_id: str, cid: str, my_cookie: str) 
         'SESSDATA': my_cookie
     }
     
-    try:
-        response = requests.get(
-            config.get_api_url("video_stream"),
-            params=params,
-            headers=config.get_headers_for_video(bv_id),
-            cookies=cookies
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        if data.get("code") == 0:
-            return data.get("data", {})
-        else:
-            return {"error": data.get("message", "Unknown error")}
-    except requests.exceptions.RequestException as e:
-        log_error(f"Error fetching video stream information: {e}")
-        return {"error": str(e)}
+    return _call_api(
+        config.get_api_url("video_stream"),
+        "video stream information",
+        params=params,
+        headers=config.get_headers_for_video(bv_id),
+        cookies=cookies,
+    )
 
 def download_file(config: Config, bv_id: str, url: str, output_path: Path, desc: Optional[str] = None) -> None:
     """Download file with progress bar and resume capability"""
@@ -155,7 +155,7 @@ def download_file(config: Config, bv_id: str, url: str, output_path: Path, desc:
     
     # Verify file size after download
     if output_path.stat().st_size != file_size:
-        raise Exception(f"Downloaded file size mismatch for {output_path}")
+        raise DownloadError(f"Downloaded file size mismatch for {output_path}")
     log_info(f"Downloaded file: {output_path} completed with size: {file_size}")
 
 def parallel_download(config: Config, bv_id: str, video_url: str, audio_url: str, output_dir: Path, 

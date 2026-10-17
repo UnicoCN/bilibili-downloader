@@ -1,8 +1,9 @@
 import argparse
 import sys
-import logging
 from pathlib import Path
 from src.bilibili_downloader.bilibili_downloader import BilibiliDownloader
+from src.bilibili_downloader.exceptions import BilibiliDownloaderError
+from src.bilibili_downloader.utils.logger import get_logger
 
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser.
@@ -75,29 +76,23 @@ def main() -> int:
 
         if args.only_info:
             print("✓ Video information fetched successfully")
-            print("  Check data/video_info.json and data/video_stream_info.json for details")
+            print("  Check data/video_info.json for details")
             return 0
 
         if video_file and video_file.exists():
             print(f"✓ Video downloaded successfully to: {video_file}")
             return 0
-        else:
-            print("✗ Download failed - check logs/bilibili_downloader.log for details")
-            return 1
+        print("✗ Download failed - output file was not created")
+        return 1
 
-    except FileNotFoundError as e:
-        print(f"✗ File not found: {e}")
-        return 1
-    except RuntimeError as e:
-        print(f"✗ Runtime error: {e}")
-        return 1
     except KeyboardInterrupt:
         print("\n✗ Download cancelled by user")
         return 1
+    except (BilibiliDownloaderError, FileNotFoundError, RuntimeError) as e:
+        get_logger().error(f"✗ {type(e).__name__}: {e}")
+        return 1
     except Exception as e:
-        logging.exception("Unexpected error occurred")
-        print(f"✗ Unexpected error: {e}")
-        print("  Check logs/bilibili_downloader.log for details")
+        get_logger().exception(f"✗ Unexpected error: {e}")
         return 1
 
 if __name__ == "__main__":
